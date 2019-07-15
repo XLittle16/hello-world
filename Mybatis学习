@@ -1,0 +1,150 @@
+# Mybatis学习
+
+## interceptor 描述
+
+> 1、Signature
+>
+> ```
+> @Intercepts({@Signature(
+>       type = StatementHandler.class,
+>       method = "prepare",
+>       args = {Connection.class, Integer.class}
+> )})
+> ```
+
+拿到参数：
+
+```
+StatementHandler stmtHandler = (StatementHandler) MybatisHelper.getUnProxyObject(invocation.getTarget());
+//获取mataObject
+MetaObject metaStatementHandler = SystemMetaObject.forObject(stmtHandler);
+//解析参数
+BoundSql boundSql = (BoundSql) metaStatementHandler.getValue("delegate.boundSql");
+
+if (isSupportedSql(boundSql.getSql())) {
+   logger.debug("加密之前的参数:{}", JSON.toJSONString(boundSql.getParameterObject()));
+   SFAnnotationDataEncryptionUtil.encryptObject(boundSql.getParameterObject());
+   logger.debug("加密之后的参数:{}", JSON.toJSONString(boundSql.getParameterObject()));
+}
+return invocation.proceed()
+
+--判断逻辑：
+
+/**
+	 * 判断类型sql是否支持 ===> 加密适用新增和更新
+	 *
+	 * @param sql
+	 * @return
+	 */
+	private static boolean isSupportedSql(String sql) {
+		String trimSql = sql.trim().toLowerCase();
+		int idx = trimSql.indexOf("insert");
+		return idx == 0;
+	}
+	
+	
+--取值逻辑：
+
+package com.xl.sheyla.mvcdemo.sfsecurity.mybatisInterceptor;
+
+import java.lang.reflect.Field;
+
+import com.xl.sheyla.mvcdemo.sfsecurity.utils.Exceptions;
+import org.apache.ibatis.reflection.MetaObject;
+import org.apache.ibatis.reflection.SystemMetaObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ MybatisHelper帮助类
+ */
+public class MybatisHelper {
+	private static final Logger logger = LoggerFactory.getLogger(MybatisHelper.class);
+
+	private MybatisHelper() {
+
+	}
+
+	/**
+	 * 因为有代理,获取真实的对象
+	 *
+	 * @param target
+	 * @return
+	 */
+	public static Object getUnProxyObject(Object target) {
+		MetaObject metaStatementHandler = SystemMetaObject.forObject(target);
+		Object object = null;
+
+		while (metaStatementHandler.hasGetter("h")) {
+			object = metaStatementHandler.getValue("h");
+			metaStatementHandler = SystemMetaObject.forObject(object);
+		}
+		while (metaStatementHandler.hasGetter("target")) {
+			object = metaStatementHandler.getValue("target");
+			metaStatementHandler = SystemMetaObject.forObject(object);
+		}
+
+		return object == null ? target : object;
+	}
+
+
+	public static Object getFieldValue(Object obj, String fieldName) {
+		try {
+			Field targetField = getTargetField(obj.getClass(), fieldName);
+			return targetField.get(obj);
+		} catch (Exception e) {
+			String errorMsg = String.format("反射读取指定类字段失败，class:%s,fieldName%s", obj.getClass().getName(), fieldName);
+			logger.error("{},异常 {}", errorMsg, Exceptions.getStackTraceAsString(e));
+			throw new IllegalStateException(errorMsg, e);
+		}
+	}
+
+	public static Field getTargetField(Class<?> targetClass, String fieldName) throws NoSuchFieldException {
+		if (targetClass == null || Object.class.equals(targetClass)) {
+			return null;
+		}
+		final Field field = targetClass.getDeclaredField(fieldName);
+		field.setAccessible(true);
+		return field;
+	}
+
+	public static void setFieldValue(Object obj, String fieldName, Object value) {
+		if (obj != null) {
+			try {
+				Field targetField = getTargetField(obj.getClass(), fieldName);
+				targetField.set(obj, value);
+			} catch (Exception e) {
+				String errorMsg = String.format("反射设置参数失败，class:%s,fieldName%s，value:%s", obj.getClass().getName(), fieldName, value);
+				logger.error("{},异常:{}", errorMsg, Exceptions.getStackTraceAsString(e));
+				throw new IllegalArgumentException(errorMsg, e);
+			}
+
+		}
+	}
+}
+
+	
+	
+```
+
+- 执行为UPDATE、Insert操作会有值
+
+```
+@Intercepts({@Signature(
+      type = Executor.class,
+      method = "update",
+      args = {MappedStatement.class, Object.class}
+)})
+```
+
+拿到参数为：
+
+```
+Object[] queryArgs = invocation.getArgs();
+//MappedStatement ms = (MappedStatement) queryArgs[0];
+Object parameter = queryArgs[1];
+logger.debug("加密之前的参数:{}", JSON.toJSONString(parameter));
+SFAnnotationDataEncryptionUtil.encryptObject(parameter);
+logger.debug("加密之后的参数:{}", JSON.toJSONString(parameter));
+return invocation.proceed();
+```
