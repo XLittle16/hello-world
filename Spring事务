@@ -1,0 +1,329 @@
+### 1、spring 事务源码解读
+
+代码解读：
+
+https://blog.csdn.net/jyxmust/article/details/81260007
+
+
+
+org.springframework.aop.framework.CglibAopProxy.DynamicAdvisedInterceptor#intercept
+
+-》org.springframework.aop.framework.ReflectiveMethodInvocation#proceed
+
+--》org.springframework.aop.interceptor.ExposeInvocationInterceptor#invoke
+
+---》org.springframework.aop.framework.ReflectiveMethodInvocation#proceed
+
+----》org.springframework.transaction.interceptor.TransactionInterceptor#invoke
+
+-----》org.springframework.transaction.interceptor.TransactionAspectSupport#invokeWithinTransaction
+
+
+
+### 2、Spring事务集中方式
+
+https://www.cnblogs.com/ysocean/p/7617620.html
+
+
+
+```
+protected Object invokeWithinTransaction(Method method, Class<?> targetClass, final InvocationCallback invocation)
+      throws Throwable {
+
+   // If the transaction attribute is null, the method is non-transactional.
+   final TransactionAttribute txAttr = getTransactionAttributeSource().getTransactionAttribute(method, targetClass);
+   final PlatformTransactionManager tm = determineTransactionManager(txAttr);
+   final String joinpointIdentification = methodIdentification(method, targetClass, txAttr);
+
+   if (txAttr == null || !(tm instanceof CallbackPreferringPlatformTransactionManager)) {
+      // Standard transaction demarcation with getTransaction and commit/rollback calls.
+      TransactionInfo txInfo = createTransactionIfNecessary(tm, txAttr, joinpointIdentification);
+      Object retVal = null;
+      try {
+         // This is an around advice: Invoke the next interceptor in the chain.
+         // This will normally result in a target object being invoked.
+         retVal = invocation.proceedWithInvocation();
+      }
+      catch (Throwable ex) {
+         // target invocation exception
+         completeTransactionAfterThrowing(txInfo, ex);
+         throw ex;
+      }
+      finally {
+         cleanupTransactionInfo(txInfo);
+      }
+      commitTransactionAfterReturning(txInfo);
+      return retVal;
+   }
+```
+
+
+
+
+
+1、声明式事务处理实现转账（基于AOP的 注解 配置）
+
+设置
+
+```
+<!-- 开启service注解支持 -->
+<context:component-scan base-package="com.xl.sheyla.mvcdemo.service,com.xl.sheyla.mvcdemo.common"/>
+
+
+<!-- (事务管理)transaction manager, use JtaTransactionManager for global tx -->
+<bean id="transactionManager"
+      class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+```
+
+使用：
+
+```
+@Transactional
+public void transfer(String outer, String inner, int money) {
+   accountDao.in(inner, money);
+   int i = 1 / 0;
+   accountDao.out(outer, money);
+}
+```
+
+
+
+2、声明式事务处理实现转账（基于AOP的 xml 配置）　
+
+
+
+```
+ <!-- 1 事务管理器 -->
+    <bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <!-- 2 事务详情（事务通知）  ， 在aop筛选基础上，比如对ABC三个确定使用什么样的事务。例如：AC读写、B只读 等
+        <tx:attributes> 用于配置事务详情（属性属性）
+            <tx:method name=""/> 详情具体配置
+                propagation 传播行为 ， REQUIRED：必须；REQUIRES_NEW:必须是新的
+                isolation 隔离级别
+    -->
+    <tx:advice id="txAdvice" transaction-manager="txManager">
+        <tx:attributes>
+            <tx:method name="transfer*" propagation="REQUIRED" isolation="DEFAULT"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- 3 AOP编程，利用切入点表达式从目标类方法中 确定增强的连接器，从而获得切入点 -->
+    <aop:config>
+        <aop:advisor advice-ref="txAdvice" pointcut="execution(* com.xl.sheyla.mvcdemo.service..*.*(..))"/>
+    </aop:config>
+```
+
+
+
+例子：
+
+AccountDao.xml
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xl.sheyla.mvcdemo.dao.springtx.AccountDao">
+    <update id="out">
+      update sys_account set money=money - #{arg1} where name=#{arg0}
+    </update>
+
+    <update id="in">
+      update sys_account set money=money + #{arg1} where name=#{arg0}
+    </update>
+</mapper>
+```
+
+AccountDao
+
+```
+package com.xl.sheyla.mvcdemo.dao.springtx;
+
+/** 
+ * *********************************************
+ *  ID   DATE           PERSON          REASON
+ *  1    2019/7/23      01373499         Create
+ *
+ * *********************************************
+ * </pre>
+ */
+public interface AccountDao {
+   /**
+    * 根据用户名减少账户金额
+    */
+   void out(String outer, int money);
+
+
+   /**
+    * 根据用户名增加账户金额
+    */
+   void in(String inner, int money);
+}
+```
+
+AccountService
+
+```
+package com.xl.sheyla.mvcdemo.service.springtx;
+
+/** 
+ * *********************************************
+ *  ID   DATE           PERSON          REASON
+ *  1    2019/7/23      01373499         Create
+ *
+ * *********************************************
+ * </pre>
+ */
+public interface AccountService {
+   /**
+    * 转账
+    *
+    * @param outer 汇款人
+    * @param inner 收款人
+    * @param money 交易金额
+    */
+   void transfer(String outer, String inner, int money);
+
+   void transferAdvisor(String outer, String inner, int money);
+
+   void transferCatch(String outer, String inner, int money);
+
+   void transferAdvisorCatch(String outer, String inner, int money);
+}
+```
+
+AccountServiceImpl
+
+```
+package com.xl.sheyla.mvcdemo.service.springtx.impl;
+
+import com.xl.sheyla.mvcdemo.dao.springtx.AccountDao;
+import com.xl.sheyla.mvcdemo.service.springtx.AccountService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** 
+ * *********************************************
+ *  ID   DATE           PERSON          REASON
+ *  1    2019/7/23      01373499         Create
+ *
+ * *********************************************
+ * </pre>
+ */
+@Service
+public class AccountServiceImpl implements AccountService {
+   @Autowired
+   private AccountDao accountDao;
+
+   @Override
+   @Transactional
+   public void transfer(String outer, String inner, int money) {
+      accountDao.in(inner, money);
+      int i = 1 / 0;
+      accountDao.out(outer, money);
+   }
+
+   public void transferCatch(String outer, String inner, int money) {
+      try {
+         accountDao.in(inner, money);
+         int i = 1 / 0;
+         accountDao.out(outer, money);
+      }catch (Exception e){
+         e.printStackTrace();
+      }
+
+   }
+
+   @Override
+   public void transferAdvisor(String outer, String inner, int money) {
+      accountDao.in(inner, money);
+      int i = 1 / 0;
+      accountDao.out(outer, money);
+   }
+
+   public void transferAdvisorCatch(String outer, String inner, int money) {
+      try {
+         accountDao.in(inner, money);
+         int i = 1 / 0;
+         accountDao.out(outer, money);
+      }catch (Exception e){
+         e.printStackTrace();
+      }
+   }
+}
+```
+
+SpringtxTestController
+
+```
+package com.xl.sheyla.mvcdemo.controller.springtx;
+
+import java.util.Map;
+
+import com.xl.sheyla.mvcdemo.service.springtx.AccountService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** 
+ * *********************************************
+ *  ID   DATE           PERSON          REASON
+ *  1    2019/7/23      01373499         Create
+ *
+ * *********************************************
+ * </pre>
+ */
+@RestController
+@RequestMapping("tx")
+public class SpringtxTestController {
+   @Autowired
+   private AccountService accountService;
+
+   @RequestMapping("text")
+   public String transfer(@RequestBody Map map) {
+      String outer = (String) map.get("outer");
+      String inner = (String) map.get("outer");
+      int money = (Integer) map.get("money");
+      accountService.transfer(outer, inner, money);
+
+      return "OK";
+   }
+
+   @RequestMapping("t0")
+   public String transferAdvisor(@RequestBody Map map) {
+      String outer = (String) map.get("outer");
+      String inner = (String) map.get("outer");
+      int money = (Integer) map.get("money");
+      accountService.transferAdvisor(outer, inner, money);
+
+      return "OK";
+   }
+
+   @RequestMapping("t1")
+   public String transferAdvisorCatch(@RequestBody Map map) {
+      String outer = (String) map.get("outer");
+      String inner = (String) map.get("outer");
+      int money = (Integer) map.get("money");
+      accountService.transferAdvisorCatch(outer, inner, money);
+
+      return "OK";
+   }
+
+   @RequestMapping("t2")
+   public String transferCatch(@RequestBody Map map) {
+      String outer = (String) map.get("outer");
+      String inner = (String) map.get("outer");
+      int money = (Integer) map.get("money");
+      accountService.transferCatch(outer, inner, money);
+
+      return "OK";
+   }
+}
+```
