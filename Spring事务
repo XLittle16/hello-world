@@ -327,3 +327,69 @@ public class SpringtxTestController {
    }
 }
 ```
+
+
+
+# 事务自定义标签
+
+```
+annotation-driven
+```
+
+
+
+org.springframework.transaction.config.TxNamespaceHandler
+
+```
+public class TxNamespaceHandler extends NamespaceHandlerSupport {
+
+   static final String TRANSACTION_MANAGER_ATTRIBUTE = "transaction-manager";
+
+   static final String DEFAULT_TRANSACTION_MANAGER_BEAN_NAME = "transactionManager";
+
+
+   static String getTransactionManagerName(Element element) {
+      return (element.hasAttribute(TRANSACTION_MANAGER_ATTRIBUTE) ?
+            element.getAttribute(TRANSACTION_MANAGER_ATTRIBUTE) : DEFAULT_TRANSACTION_MANAGER_BEAN_NAME);
+   }
+
+
+   @Override
+   public void init() {
+      registerBeanDefinitionParser("advice", new TxAdviceBeanDefinitionParser());
+      registerBeanDefinitionParser("annotation-driven", new AnnotationDrivenBeanDefinitionParser());
+      registerBeanDefinitionParser("jta-transaction-manager", new JtaTransactionManagerBeanDefinitionParser());
+   }
+
+}
+```
+
+
+
+注册了三个类：
+
+org.springframework.transaction.config.AnnotationDrivenBeanDefinitionParser.AopAutoProxyConfigurer
+
+方法【重要】
+
+org.springframework.transaction.config.AnnotationDrivenBeanDefinitionParser.AopAutoProxyConfigurer#configureAutoProxyCreator
+
+
+
+
+
+Spring切面的两种增强
+
+
+
+一个是advice（通知）一个是advisor（顾问）
+
+https://www.cnblogs.com/zhangzongle/p/5944906.html
+
+
+
+
+
+切点表达式
+
+org.springframework.aop.aspectj.AspectJExpressionPointcut
