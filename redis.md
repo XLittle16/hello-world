@@ -1,3 +1,15 @@
+window安装redis
+
+https://www.cnblogs.com/dingguofeng/p/8709476.html
+
+下载地址
+
+https://github.com/microsoftarchive/redis/releases
+
+直接解压使用
+
+
+
 1、redis 主从模式，如果主挂了，从需要手工转移，为了自动故障转移，实现了哨兵模式
 
 https://www.liangzl.com/get-article-detail-29695.html
@@ -21,3 +33,7 @@ https://www.liangzl.com/get-article-detail-29695.html
 然后对客户端发出通知
 
 然后将原来的maseter更新为slave，当他恢复后，加入到slave
+
+
+
+
