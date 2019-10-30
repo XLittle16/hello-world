@@ -1,25 +1,17 @@
-1、com.sf.coms.ntms.service.workorder.impl.EoWorkOrderServiceImpl#workConfirmIssueTms
-
+1、
 使用：CompletableFuture.runAsync不带返回值
 
 
 
-2、com.sf.coms2.common.util.OkHttpUtil#sendAsync
-
+2、
 使用：okHttpClient
 
-3、com.sf.coms.push.common.util.ProxyOkHttp#sendAsync(java.lang.String, java.lang.String, okhttp3.Callback, java.lang.String, boolean)
-
+3、
 使用：httpsOkHttpClient
 
 4、org.springframework.web.client.AsyncRestTemplate#AsyncRestTemplate(org.springframework.http.client.AsyncClientHttpRequestFactory, org.springframework.http.client.ClientHttpRequestFactory)
 
 5、
-
-com.sf.coms.ntms.web.config.JsonConfiguration#asyncRestTemplate
-
-
-
 
 
 
