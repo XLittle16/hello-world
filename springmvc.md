@@ -1,6 +1,45 @@
 1、url寻找
 
+1、解析参数
 
+org.springframework.web.servlet.mvc.method.RequestMappingInfo#getMatchingCondition
+
+2、构建匹配的处理类
+
+org.springframework.web.method.HandlerMethod#HandlerMethod(org.springframework.web.method.HandlerMethod, java.lang.Object)
+
+3、添加处理链
+
+org.springframework.web.servlet.handler.AbstractHandlerMapping#getHandlerExecutionChain
+
+4、获取请求参数
+
+org.springframework.web.method.support.InvocableHandlerMethod#getMethodArgumentValues
+
+
+
+4.1 mybatis匹配路径（mappedStatements对应关系）
+
+org.apache.ibatis.session.Configuration#getMappedStatement(java.lang.String, boolean)
+
+4.2 解析mybatis节点信息
+
+org.apache.ibatis.scripting.xmltags.MixedSqlNode#apply
+
+```
+<select id="getUserByBean" parameterType="userBean" resultType="userBean">
+    select
+    <include refid="sysUserResult"></include>
+    from d_user where 1=1
+    <include refid="sysUserParams"></include>
+</select>
+```
+
+4.3 解析if语句的值
+
+org.apache.ibatis.ognl.Ognl#getValue(java.lang.Object, java.util.Map, java.lang.Object, java.lang.Class)
+
+and语句解析org.apache.ibatis.ognl.ASTAnd#getValueBody
 
 2、注解扫描
 
