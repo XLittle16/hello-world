@@ -25,3 +25,6 @@ https://my.oschina.net/u/1772272/blog/1858890
 4、jstack 488 | grep 342 （ 查看线程的状态）
 
 https://www.jianshu.com/p/b11893a045b3
+
+内存参考文章
+https://segmentfault.com/a/1190000017226359#articleHeader6
